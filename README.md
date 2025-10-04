@@ -1,15 +1,16 @@
 # LangPrompt Python SDK
 
-LangPrompt Python SDK 是 [LangPrompt](https://github.com/langprompt) 项目的官方 Python 客户端库，提供简洁易用的 API 来管理和使用 AI Prompt。
+LangPrompt Python SDK 是 [LangPrompt](https://github.com/deku0818/langprompt) 的 Python 客户端库，提供简洁易用的 API 来管理和使用 AI Prompt。
 
 ## 项目简介
 
-LangPrompt 是 Prompt 管理界的 **GitHub + Apollo** 结合体，提供：
+LangPrompt 是 Prompt 管理界的 **GitHub + Apollo** 结合体，励志提供：
 
 - 🔄 **完整的版本管理** - 类似 Git 的版本控制机制
 - 🔐 **企业级权限管理** - 多层级角色权限控制（Owner/Admin/Editor/Viewer）
 - 🚀 **高性能 API** - 异步处理，支持大规模并发
 - 📊 **灵活的元数据** - 支持自定义配置和标签管理
+- 🤖 **AI友好** - 未来会提供相关MCP，便于测试、创建、迭代Prompt
 - 🏷️ **智能标签系统** - 支持 production/staging/development 等环境标签
 
 ## 核心概念
@@ -237,18 +238,14 @@ mypy langprompt
 
 ## 相关链接
 
-- [LangPrompt 官网](https://langprompt.com)
-- [LangPrompt 服务端](https://github.com/langprompt/langprompt-server)
+- [LangPrompt 服务端](https://github.com/deku0818/langprompt)
 - [设计文档](./docs/langprompt设计文档.md)
-- [API 文档](https://docs.langprompt.com/api)
-- [问题反馈](https://github.com/langprompt/langprompt-python/issues)
 
-## 支持
 
-- 📧 Email: support@langprompt.com
-- 💬 Discord: [加入社区](https://discord.gg/langprompt)
-- 📚 文档: [https://docs.langprompt.com](https://docs.langprompt.com)
+## ⚠️注意
 
----
+本项目是源于探索Vibe Coding的产物，超过99%的代码由AI编写。
 
-Made with ❤️ by LangPrompt Team
+此项目存在非常早期的阶段，请勿用于生产环境。
+
+如有问题或建议，欢迎提交 Issue 或 Pull Request。
