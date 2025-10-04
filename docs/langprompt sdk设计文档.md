@@ -10,7 +10,7 @@ LangPrompt Python SDK 是官方 Python 客户端库，专注于**提示词的获
 - **类型安全**: 完整的类型注解支持
 - **高性能**: 支持异步操作和智能缓存
 - **容错性强**: 内置重试机制和友好的错误处理
-- **功能聚焦**: 专注于提示词获取，管理功能由 Web 端完成
+- **功能聚焦**: 优先专注于提示词获取，管理功能由 Web 端完成
 
 ### 1.2 核心功能边界
 
@@ -126,21 +126,9 @@ langprompt/
 ```python
 client.projects.get()                          # 获取当前项目信息
 client.prompts.list()                          # 列出所有提示词
-client.prompts.list(name="greeting")            # 按名称获取提示词
-client.prompts.get(                    # 获取提示词内容
-    name="greeting",
-    label="production"
-)
-client.prompts.get(prompt_name="greeting", version=3)
-# 必须传递label or version 确保唯一
-client.prompts.list(prompt_name="greeting")   # 获取指定提示词列表
 ```
 
 ### 4.3 命名规范
-
-- **支持 ID 和 Name 双重访问**:
-  - 传入 `name` 时，SDK 内部自动转换为 `id` 查询
-  - 传入 `id` 时，直接使用 ID 查询（性能更优）
 
 - **参数命名一致性**:
   - `project_id` / `project_name`

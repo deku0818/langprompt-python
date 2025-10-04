@@ -111,12 +111,13 @@ class AsyncLangPrompt:
     """Asynchronous LangPrompt SDK client.
 
     Example:
-        >>> async with AsyncLangPrompt(
+        >>> client = AsyncLangPrompt(
         ...     project_name="my-project",
         ...     api_key="your-api-key"
-        ... ) as client:
-        ...     project = await client.projects.get()
-        ...     prompt = await client.prompts.get("greeting", label="production")
+        ... )
+        >>> project = await client.projects.get()
+        >>> prompt = await client.prompts.get("greeting", label="production")
+        >>> # Optional: await client.close()  # Explicit cleanup if needed
     """
 
     def __init__(
@@ -180,16 +181,18 @@ class AsyncLangPrompt:
             self._http_client, self._config, self._cache
         )
 
-    async def __aenter__(self) -> "AsyncLangPrompt":
-        """Async context manager entry."""
-        return self
-
-    async def __aexit__(self, *args: Any) -> None:
-        """Async context manager exit."""
-        await self.close()
+    def __del__(self) -> None:
+        """Cleanup on deletion."""
+        # Delegate cleanup to http client's __del__
+        pass
 
     async def close(self) -> None:
-        """Close client and cleanup resources."""
+        """Close client and cleanup resources.
+
+        Optional method for explicit cleanup. The client will automatically
+        cleanup resources when garbage collected, but you can call this
+        method if you need immediate cleanup.
+        """
         await self._http_client.close()
 
     @property

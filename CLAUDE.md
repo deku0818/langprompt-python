@@ -91,8 +91,21 @@ client.prompts.list(prompt_name="greeting")    # List versions for prompt
 ### Synchronous and Asynchronous APIs
 
 The SDK provides both sync and async APIs:
-- `LangPrompt` - synchronous client
-- `AsyncLangPrompt` - asynchronous client
+- `LangPrompt` - synchronous client (use `with` context manager or manual `close()`)
+- `AsyncLangPrompt` - asynchronous client (auto cleanup, optional `await close()`)
+
+**Async Usage**:
+```python
+# Simple usage - automatic cleanup
+client = AsyncLangPrompt(api_key="...")
+result = await client.prompts.get("greeting", label="production")
+# Resources automatically cleaned up on program exit
+
+# Explicit cleanup (optional)
+client = AsyncLangPrompt(api_key="...")
+result = await client.prompts.get("greeting", label="production")
+await client.close()  # Immediate cleanup if needed
+```
 
 ### Error Handling
 

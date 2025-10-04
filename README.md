@@ -80,15 +80,20 @@ from langprompt import AsyncLangPrompt
 import asyncio
 
 async def main():
-    async with AsyncLangPrompt(
+    # 直接创建客户端,无需 async with
+    client = AsyncLangPrompt(
         project_name="my-project",
         api_key="your-api-key"
-    ) as client:
-        content = await client.prompts.get_prompt(
-            prompt_name="greeting",
-            label="production"
-        )
-        print(content)
+    )
+
+    content = await client.prompts.get_prompt(
+        prompt_name="greeting",
+        label="production"
+    )
+    print(content)
+
+    # 可选:显式关闭(自动清理会在程序退出时处理)
+    # await client.close()
 
 asyncio.run(main())
 ```

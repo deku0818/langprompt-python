@@ -226,20 +226,37 @@ class AsyncHttpClient:
         """
         self.config = config
         self._client: httpx.AsyncClient | None = None
+        self._closed = False
 
-    async def __aenter__(self) -> "AsyncHttpClient":
-        """Async context manager entry."""
-        return self
-
-    async def __aexit__(self, *args: Any) -> None:
-        """Async context manager exit."""
-        await self.close()
+    def __del__(self) -> None:
+        """Cleanup on deletion."""
+        if self._client and not self._closed:
+            try:
+                # Schedule cleanup if event loop is available
+                import asyncio
+                try:
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        loop.create_task(self.close())
+                    else:
+                        loop.run_until_complete(self.close())
+                except RuntimeError:
+                    # No event loop, sync close
+                    import warnings
+                    warnings.warn(
+                        "AsyncHttpClient was not properly closed. "
+                        "Consider calling await client.close() explicitly.",
+                        ResourceWarning,
+                    )
+            except Exception:
+                pass
 
     async def close(self) -> None:
         """Close HTTP client."""
-        if self._client:
+        if self._client and not self._closed:
             await self._client.aclose()
             self._client = None
+            self._closed = True
 
     @property
     def client(self) -> httpx.AsyncClient:
