@@ -355,3 +355,325 @@ async def test_async_get_prompt(
     assert content == [{"text": "Hello, world!"}]
 
 
+# Create prompt tests
+
+
+@respx.mock
+def test_create_version_for_existing_prompt(client, project_id, prompt_id, prompt_data):
+    """Test creating a new version for existing prompt."""
+    created_version = {
+        "id": "770e8400-e29b-41d4-a716-446655440002",
+        "prompt_id": prompt_id,
+        "version": 2,
+        "prompt": [{"role": "user", "content": "你好{name}"}],
+        "type": "text",
+        "labels": ["production"],
+        "metadata": {"test": "value"},
+        "commit_message": "提交信息",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z",
+    }
+
+    # Mock prompt name resolution - found
+    respx.get(
+        f"https://api.test.langprompt.com/api/v1/projects/{project_id}/prompts",
+        params={"name": "greeting"},
+    ).mock(return_value=Response(200, json=prompt_data))
+
+    # Mock version creation
+    respx.post(
+        f"https://api.test.langprompt.com/api/v1/projects/{project_id}/prompts/{prompt_id}/versions"
+    ).mock(return_value=Response(200, json=created_version))
+
+    result = client.prompts.create(
+        name="greeting",
+        prompt="你好{name}",
+        type="text",
+        metadata={"test": "value"},
+        labels=["production"],
+        commit_message="提交信息",
+    )
+
+    assert isinstance(result, PromptVersion)
+    assert result.version == 2
+    assert result.prompt == [{"role": "user", "content": "你好{name}"}]
+    assert result.type == "text"
+    assert result.labels == ["production"]
+    assert result.metadata == {"test": "value"}
+
+
+@respx.mock
+def test_create_version_chat_type(client, project_id, prompt_id, prompt_data):
+    """Test creating a chat version for existing prompt."""
+    created_version = {
+        "id": "770e8400-e29b-41d4-a716-446655440002",
+        "prompt_id": prompt_id,
+        "version": 2,
+        "prompt": [
+            {"role": "system", "content": "系统提示词"},
+            {"role": "user", "content": "你好{name}"},
+        ],
+        "type": "chat",
+        "labels": ["production"],
+        "metadata": {},
+        "commit_message": "提交信息",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z",
+    }
+
+    # Mock prompt name resolution - found
+    respx.get(
+        f"https://api.test.langprompt.com/api/v1/projects/{project_id}/prompts",
+        params={"name": "greeting"},
+    ).mock(return_value=Response(200, json=prompt_data))
+
+    # Mock version creation
+    respx.post(
+        f"https://api.test.langprompt.com/api/v1/projects/{project_id}/prompts/{prompt_id}/versions"
+    ).mock(return_value=Response(200, json=created_version))
+
+    result = client.prompts.create(
+        name="greeting",
+        prompt=[
+            {"role": "system", "content": "系统提示词"},
+            {"role": "user", "content": "你好{name}"},
+        ],
+        type="chat",
+        metadata={},
+        labels=["production"],
+        commit_message="提交信息",
+    )
+
+    assert isinstance(result, PromptVersion)
+    assert result.version == 2
+    assert len(result.prompt) == 2
+    assert result.type == "chat"
+
+
+@respx.mock
+def test_create_prompt_not_found_without_force(client, project_id):
+    """Test that creating version for non-existent prompt without force raises NotFoundError."""
+    # Mock prompt name resolution - not found
+    respx.get(
+        f"https://api.test.langprompt.com/api/v1/projects/{project_id}/prompts",
+        params={"name": "nonexistent"},
+    ).mock(return_value=Response(200, json={}))
+
+    with pytest.raises(NotFoundError, match="not found.*force=True"):
+        client.prompts.create(
+            name="nonexistent",
+            prompt="Some content",
+            type="text",
+        )
+
+
+@respx.mock
+def test_create_with_force_creates_prompt(client, project_id):
+    """Test creating prompt with force=True when prompt doesn't exist."""
+    created_prompt_id = "660e8400-e29b-41d4-a716-446655440001"
+
+    created_prompt = {
+        "id": created_prompt_id,
+        "name": "new-prompt",
+        "type": "text",
+        "description": "",
+        "tags": [],
+        "project_id": project_id,
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z",
+    }
+
+    created_version = {
+        "id": "770e8400-e29b-41d4-a716-446655440002",
+        "prompt_id": created_prompt_id,
+        "version": 1,
+        "prompt": [{"role": "user", "content": "New prompt"}],
+        "type": "text",
+        "labels": [],
+        "metadata": {},
+        "commit_message": "Initial version",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z",
+    }
+
+    # Mock prompt name resolution - not found
+    respx.get(
+        f"https://api.test.langprompt.com/api/v1/projects/{project_id}/prompts",
+        params={"name": "new-prompt"},
+    ).mock(return_value=Response(200, json={}))
+
+    # Mock prompt creation (Step 1)
+    respx.post(
+        f"https://api.test.langprompt.com/api/v1/projects/{project_id}/prompts"
+    ).mock(return_value=Response(200, json=created_prompt))
+
+    # Mock version creation (Step 2)
+    respx.post(
+        f"https://api.test.langprompt.com/api/v1/projects/{project_id}/prompts/{created_prompt_id}/versions"
+    ).mock(return_value=Response(200, json=created_version))
+
+    result = client.prompts.create(
+        name="new-prompt",
+        prompt="New prompt",
+        type="text",
+        force=True,
+    )
+
+    assert isinstance(result, PromptVersion)
+    assert result.version == 1
+
+
+@respx.mock
+def test_create_force_requires_type_when_not_exists(client, project_id):
+    """Test that force=True requires type parameter when prompt doesn't exist."""
+    # Mock prompt name resolution - not found
+    respx.get(
+        f"https://api.test.langprompt.com/api/v1/projects/{project_id}/prompts",
+        params={"name": "new-prompt"},
+    ).mock(return_value=Response(200, json={}))
+
+    with pytest.raises(ValueError, match="'type' is required"):
+        client.prompts.create(
+            name="new-prompt",
+            prompt="Some content",
+            force=True,
+            # type not provided
+        )
+
+
+def test_create_prompt_invalid_type(client):
+    """Test that invalid type raises ValidationError."""
+    with pytest.raises(ValidationError, match="Invalid prompt type"):
+        client.prompts.create(
+            name="test",
+            prompt="content",
+            type="invalid",
+        )
+
+
+def test_create_prompt_text_type_wrong_format(client):
+    """Test that passing list for text type raises ValidationError."""
+    with pytest.raises(ValidationError, match="Prompt must be a string"):
+        client.prompts.create(
+            name="test",
+            prompt=[{"role": "user", "content": "test"}],
+            type="text",
+        )
+
+
+def test_create_prompt_chat_type_wrong_format(client):
+    """Test that passing string for chat type raises ValidationError."""
+    with pytest.raises(ValidationError, match="Prompt must be a list"):
+        client.prompts.create(
+            name="test",
+            prompt="some string",
+            type="chat",
+        )
+
+
+# Async create prompt tests
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_async_create_version_for_existing(
+    async_client, project_id, prompt_id, prompt_data
+):
+    """Test async creating a new version for existing prompt."""
+    created_version = {
+        "id": "770e8400-e29b-41d4-a716-446655440002",
+        "prompt_id": prompt_id,
+        "version": 2,
+        "prompt": [{"role": "user", "content": "你好{name}"}],
+        "type": "text",
+        "labels": ["production"],
+        "metadata": {"test": "value"},
+        "commit_message": "提交信息",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z",
+    }
+
+    # Mock prompt name resolution - found
+    respx.get(
+        f"https://api.test.langprompt.com/api/v1/projects/{project_id}/prompts",
+        params={"name": "greeting"},
+    ).mock(return_value=Response(200, json=prompt_data))
+
+    # Mock version creation
+    respx.post(
+        f"https://api.test.langprompt.com/api/v1/projects/{project_id}/prompts/{prompt_id}/versions"
+    ).mock(return_value=Response(200, json=created_version))
+
+    result = await async_client.prompts.create(
+        name="greeting",
+        prompt="你好{name}",
+        type="text",
+        metadata={"test": "value"},
+        labels=["production"],
+        commit_message="提交信息",
+    )
+
+    assert isinstance(result, PromptVersion)
+    assert result.version == 2
+    assert result.prompt == [{"role": "user", "content": "你好{name}"}]
+    assert result.type == "text"
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_async_create_with_force(async_client, project_id):
+    """Test async creating prompt with force=True when doesn't exist."""
+    created_prompt_id = "660e8400-e29b-41d4-a716-446655440001"
+
+    created_prompt = {
+        "id": created_prompt_id,
+        "name": "new-prompt",
+        "type": "text",
+        "description": "",
+        "tags": [],
+        "project_id": project_id,
+        "created_at": "2024-01-02T00:00:00Z",
+        "updated_at": "2024-01-02T00:00:00Z",
+    }
+
+    created_version = {
+        "id": "770e8400-e29b-41d4-a716-446655440003",
+        "prompt_id": created_prompt_id,
+        "version": 1,
+        "prompt": [{"role": "user", "content": "Updated content"}],
+        "type": "text",
+        "labels": ["staging"],
+        "metadata": {},
+        "commit_message": "Initial version",
+        "created_at": "2024-01-02T00:00:00Z",
+        "updated_at": "2024-01-02T00:00:00Z",
+    }
+
+    # Mock prompt name resolution - not found
+    respx.get(
+        f"https://api.test.langprompt.com/api/v1/projects/{project_id}/prompts",
+        params={"name": "new-prompt"},
+    ).mock(return_value=Response(200, json={}))
+
+    # Mock prompt creation (Step 1)
+    respx.post(
+        f"https://api.test.langprompt.com/api/v1/projects/{project_id}/prompts"
+    ).mock(return_value=Response(200, json=created_prompt))
+
+    # Mock version creation (Step 2)
+    respx.post(
+        f"https://api.test.langprompt.com/api/v1/projects/{project_id}/prompts/{created_prompt_id}/versions"
+    ).mock(return_value=Response(200, json=created_version))
+
+    result = await async_client.prompts.create(
+        name="new-prompt",
+        prompt="Updated content",
+        type="text",
+        labels=["staging"],
+        force=True,
+    )
+
+    assert isinstance(result, PromptVersion)
+    assert result.version == 1
+
+

@@ -1,6 +1,7 @@
 """Pytest configuration and fixtures."""
 
 import pytest
+import pytest_asyncio
 
 from langprompt import LangPrompt, AsyncLangPrompt
 from langprompt.config import Config
@@ -35,7 +36,7 @@ def client(config):
     client.close()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def async_client(config):
     """Create asynchronous test client."""
     client = AsyncLangPrompt(
