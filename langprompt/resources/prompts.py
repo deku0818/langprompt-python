@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Union, Literal
-
+from collections.abc import Sequence
 from langchain_core.prompts import (
     ChatPromptTemplate,
     MessagesPlaceholder,
     PromptTemplate,
 )
+
+from langchain_core.messages import convert_to_openai_messages, MessageLikeRepresentation
 
 from langprompt.models import PagedResponse, Prompt, PromptVersion
 from langprompt.resources.base import AsyncBaseResource, BaseResource
@@ -248,52 +250,12 @@ class PromptsResource(BaseResource):
 
                 return ChatPromptTemplate(chat_prompt)
 
-    def _transform_prompt_content(
-        self,
-        prompt: str | list[dict],
-        type: Literal['chat', 'text'] | None = None,
-    ) -> list[dict]:
-        """Transform prompt content to standardized format.
-
-        Args:
-            prompt: Prompt content (string for text type, list of dicts for chat type)
-            type: Prompt type ("text" or "chat")
-
-        Returns:
-            Standardized prompt content as list of dicts
-
-        Raises:
-            ValidationError: If prompt type is invalid or prompt format is wrong
-        """
-        from langprompt.exceptions import ValidationError
-
-        # Validate type if provided
-        if type is not None and type not in ("text", "chat"):
-            raise ValidationError(f"Invalid prompt type: {type}. Must be 'text' or 'chat'")
-
-        # Transform prompt content based on type
-        match type:
-            case "text":
-                if not isinstance(prompt, str):
-                    raise ValidationError("Prompt must be a string when type='text'")
-                return [{"role": "user", "content": prompt}]
-            case "chat":
-                if not isinstance(prompt, list):
-                    raise ValidationError("Prompt must be a list when type='chat'")
-                return prompt
-            case _:
-                # Type not specified, auto-detect based on prompt format
-                if isinstance(prompt, str):
-                    return [{"role": "user", "content": prompt}]
-                else:
-                    return prompt
-
     def _create_version(
         self,
         project_id: str,
         prompt_id: str,
         prompt_name: str,
-        prompt_content: list[dict],
+        prompt_messages: Union[MessageLikeRepresentation, Sequence[MessageLikeRepresentation]],
         metadata: dict[str, Any] | None = None,
         labels: list[str] | None = None,
         commit_message: str | None = None,
@@ -312,8 +274,9 @@ class PromptsResource(BaseResource):
         Returns:
             PromptVersion object
         """
+        
         version_data = {
-            "prompt": prompt_content,
+            "prompt": convert_to_openai_messages(prompt_messages),
             "labels": labels or [],
             "metadata": metadata or {},
             "commit_message": commit_message or "New version",
@@ -335,7 +298,7 @@ class PromptsResource(BaseResource):
         project_id: str,
         name: str,
         type: Literal['chat', 'text'],
-        prompt_content: list[dict],
+        prompt_messages: Union[MessageLikeRepresentation, Sequence[MessageLikeRepresentation]],
         metadata: dict[str, Any] | None = None,
         labels: list[str] | None = None,
         commit_message: str | None = None,
@@ -368,29 +331,21 @@ class PromptsResource(BaseResource):
         prompt_result = self._get_json(prompt_response)
         created_prompt_id = prompt_result["id"]
 
-        # Step 2: Create initial version
-        version_data = {
-            "prompt": prompt_content,
-            "labels": labels or [],
-            "metadata": metadata or {},
-            "commit_message": commit_message or "Initial version",
-        }
-        version_response = self._http.post(
-            f"/projects/{project_id}/prompts/{created_prompt_id}/versions",
-            json=version_data,
+        # Step 2: Create initial version (reuse _create_version)
+        return self._create_version(
+            project_id=project_id,
+            prompt_id=created_prompt_id,
+            prompt_name=name,
+            prompt_content=prompt_messages,
+            metadata=metadata,
+            labels=labels,
+            commit_message=commit_message or "Initial version",
         )
-        version_data = self._get_json(version_response)
-
-        # Clear cache
-        if name in self._prompt_cache:
-            del self._prompt_cache[name]
-
-        return PromptVersion(**version_data)
 
     def create(
         self,
         name: str,
-        prompt: str | list[dict],
+        prompt_messages: Union[MessageLikeRepresentation, Sequence[MessageLikeRepresentation]],
         type: Literal['chat', 'text'] | None = None,
         metadata: dict[str, Any] | None = None,
         labels: list[str] | None = None,
@@ -422,7 +377,6 @@ class PromptsResource(BaseResource):
         from langprompt.exceptions import NotFoundError
 
         # Transform prompt content to standardized format
-        prompt_content = self._transform_prompt_content(prompt, type)
 
         project_id = self._get_project_id()
 
@@ -438,7 +392,7 @@ class PromptsResource(BaseResource):
                 project_id=project_id,
                 prompt_id=prompt_id,
                 prompt_name=name,
-                prompt_content=prompt_content,
+                prompt_messages=prompt_messages,
                 metadata=metadata,
                 labels=labels,
                 commit_message=commit_message,
@@ -460,7 +414,7 @@ class PromptsResource(BaseResource):
                 project_id=project_id,
                 name=name,
                 type=type,
-                prompt_content=prompt_content,
+                prompt_messages=prompt_messages,
                 metadata=metadata,
                 labels=labels,
                 commit_message=commit_message,
@@ -698,52 +652,12 @@ class AsyncPromptsResource(AsyncBaseResource):
 
                 return ChatPromptTemplate(chat_prompt)
 
-    def _transform_prompt_content(
-        self,
-        prompt: str | list[dict],
-        type: Literal['chat', 'text'] | None = None,
-    ) -> list[dict]:
-        """Transform prompt content to standardized format.
-
-        Args:
-            prompt: Prompt content (string for text type, list of dicts for chat type)
-            type: Prompt type ("text" or "chat")
-
-        Returns:
-            Standardized prompt content as list of dicts
-
-        Raises:
-            ValidationError: If prompt type is invalid or prompt format is wrong
-        """
-        from langprompt.exceptions import ValidationError
-
-        # Validate type if provided
-        if type is not None and type not in ("text", "chat"):
-            raise ValidationError(f"Invalid prompt type: {type}. Must be 'text' or 'chat'")
-
-        # Transform prompt content based on type
-        match type:
-            case "text":
-                if not isinstance(prompt, str):
-                    raise ValidationError("Prompt must be a string when type='text'")
-                return [{"role": "user", "content": prompt}]
-            case "chat":
-                if not isinstance(prompt, list):
-                    raise ValidationError("Prompt must be a list when type='chat'")
-                return prompt
-            case _:
-                # Type not specified, auto-detect based on prompt format
-                if isinstance(prompt, str):
-                    return [{"role": "user", "content": prompt}]
-                else:
-                    return prompt
-
     async def _create_version(
         self,
         project_id: str,
         prompt_id: str,
         prompt_name: str,
-        prompt_content: list[dict],
+        prompt_messages: Union[MessageLikeRepresentation, Sequence[MessageLikeRepresentation]],
         metadata: dict[str, Any] | None = None,
         labels: list[str] | None = None,
         commit_message: str | None = None,
@@ -754,7 +668,7 @@ class AsyncPromptsResource(AsyncBaseResource):
             project_id: Project ID
             prompt_id: Prompt ID
             prompt_name: Prompt name (for cache clearing)
-            prompt_content: Standardized prompt content
+            prompt_messages: Prompt messages
             metadata: Optional metadata dict
             labels: Optional list of labels for the version
             commit_message: Optional commit message
@@ -762,8 +676,9 @@ class AsyncPromptsResource(AsyncBaseResource):
         Returns:
             PromptVersion object
         """
+
         version_data = {
-            "prompt": prompt_content,
+            "prompt": convert_to_openai_messages(prompt_messages),
             "labels": labels or [],
             "metadata": metadata or {},
             "commit_message": commit_message or "New version",
@@ -785,7 +700,7 @@ class AsyncPromptsResource(AsyncBaseResource):
         project_id: str,
         name: str,
         type: Literal['chat', 'text'],
-        prompt_content: list[dict],
+        prompt_messages: Union[MessageLikeRepresentation, Sequence[MessageLikeRepresentation]],
         metadata: dict[str, Any] | None = None,
         labels: list[str] | None = None,
         commit_message: str | None = None,
@@ -796,7 +711,7 @@ class AsyncPromptsResource(AsyncBaseResource):
             project_id: Project ID
             name: Prompt name
             type: Prompt type ("text" or "chat")
-            prompt_content: Standardized prompt content
+            prompt_messages: Prompt messages
             metadata: Optional metadata dict
             labels: Optional list of labels for the version
             commit_message: Optional commit message
@@ -818,29 +733,21 @@ class AsyncPromptsResource(AsyncBaseResource):
         prompt_result = self._get_json(prompt_response)
         created_prompt_id = prompt_result["id"]
 
-        # Step 2: Create initial version
-        version_data = {
-            "prompt": prompt_content,
-            "labels": labels or [],
-            "metadata": metadata or {},
-            "commit_message": commit_message or "Initial version",
-        }
-        version_response = await self._http.post(
-            f"/projects/{project_id}/prompts/{created_prompt_id}/versions",
-            json=version_data,
+        # Step 2: Create initial version (reuse _create_version)
+        return await self._create_version(
+            project_id=project_id,
+            prompt_id=created_prompt_id,
+            prompt_name=name,
+            prompt_messages=prompt_messages,
+            metadata=metadata,
+            labels=labels,
+            commit_message=commit_message or "Initial version",
         )
-        version_data = self._get_json(version_response)
-
-        # Clear cache
-        if name in self._prompt_cache:
-            del self._prompt_cache[name]
-
-        return PromptVersion(**version_data)
 
     async def create(
         self,
         name: str,
-        prompt: str | list[dict],
+        prompt_messages: Union[MessageLikeRepresentation, Sequence[MessageLikeRepresentation]],
         type: Literal['chat', 'text'] | None = None,
         metadata: dict[str, Any] | None = None,
         labels: list[str] | None = None,
@@ -854,7 +761,7 @@ class AsyncPromptsResource(AsyncBaseResource):
 
         Args:
             name: Prompt name
-            prompt: Prompt content (string for text type, list of dicts for chat type)
+            prompt_messages: Prompt messages
             type: Prompt type ("text" or "chat"), required when force=True and prompt doesn't exist
             metadata: Optional metadata dict
             labels: Optional list of labels for the version
@@ -871,9 +778,6 @@ class AsyncPromptsResource(AsyncBaseResource):
         """
         from langprompt.exceptions import NotFoundError
 
-        # Transform prompt content to standardized format
-        prompt_content = self._transform_prompt_content(prompt, type)
-
         project_id = await self._get_project_id()
 
         # Check if prompt exists
@@ -888,7 +792,7 @@ class AsyncPromptsResource(AsyncBaseResource):
                 project_id=project_id,
                 prompt_id=prompt_id,
                 prompt_name=name,
-                prompt_content=prompt_content,
+                prompt_messages=prompt_messages,
                 metadata=metadata,
                 labels=labels,
                 commit_message=commit_message,
@@ -910,7 +814,7 @@ class AsyncPromptsResource(AsyncBaseResource):
                 project_id=project_id,
                 name=name,
                 type=type,
-                prompt_content=prompt_content,
+                prompt_messages=prompt_messages,
                 metadata=metadata,
                 labels=labels,
                 commit_message=commit_message,
