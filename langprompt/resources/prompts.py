@@ -20,6 +20,84 @@ if TYPE_CHECKING:
     from langprompt.http import AsyncHttpClient, HttpClient
 
 
+def convert_messages_with_placeholder(
+    messages: Union[MessageLikeRepresentation, Sequence[MessageLikeRepresentation]]
+) -> list[dict]:
+    """Convert messages to OpenAI format with MessagesPlaceholder support.
+
+    This function extends convert_to_openai_messages to support MessagesPlaceholder
+    objects and various placeholder formats.
+
+    Args:
+        messages: Message-like object or sequence of message-like objects.
+                 Supports all formats from convert_to_openai_messages plus:
+                 - MessagesPlaceholder objects
+                 - ("placeholder", "variable_name") tuples
+                 - {"role": "placeholder", "content": "variable_name"} dicts
+
+    Returns:
+        List of message dicts in OpenAI format, with placeholders converted to
+        {"role": "placeholder", "content": "variable_name"} format.
+
+    Examples:
+        >>> # MessagesPlaceholder object
+        >>> convert_messages_with_placeholder([
+        ...     MessagesPlaceholder("history"),
+        ...     ("user", "Hello")
+        ... ])
+        [
+            {"role": "placeholder", "content": "history"},
+            {"role": "user", "content": "Hello"}
+        ]
+
+        >>> # Tuple format
+        >>> convert_messages_with_placeholder([("placeholder", "history")])
+        [{"role": "placeholder", "content": "history"}]
+
+        >>> # Dict format (pass-through)
+        >>> convert_messages_with_placeholder([{"role": "placeholder", "content": "history"}])
+        [{"role": "placeholder", "content": "history"}]
+    """
+    # Detect if we have a single message or a sequence
+    # Tuples are special - they could be a single message tuple like ("user", "Hello")
+    # or a placeholder tuple like ("placeholder", "var_name")
+    is_single_message = (
+        isinstance(messages, str) or
+        isinstance(messages, dict) or
+        isinstance(messages, MessagesPlaceholder) or
+        (isinstance(messages, tuple) and len(messages) == 2 and isinstance(messages[0], str))
+    )
+
+    if is_single_message:
+        messages = [messages]
+
+    result = []
+    for msg in messages:
+        # 1. MessagesPlaceholder object
+        if isinstance(msg, MessagesPlaceholder):
+            result.append({
+                "role": "placeholder",
+                "content": msg.variable_name
+            })
+        # 2. Tuple format: ("placeholder", "variable_name")
+        elif isinstance(msg, tuple) and len(msg) == 2 and msg[0] == "placeholder":
+            result.append({
+                "role": "placeholder",
+                "content": msg[1]
+            })
+        # 3. Dict format: {"role": "placeholder", "content": "..."}
+        elif isinstance(msg, dict) and msg.get("role") == "placeholder":
+            result.append(msg)
+        # 4. Other formats use standard conversion
+        # Pass as single-element list to avoid tuple being treated as sequence
+        else:
+            converted = convert_to_openai_messages([msg])
+            # convert_to_openai_messages with a list returns a list, take first element
+            result.append(converted[0])
+
+    return result
+
+
 class PromptsResource(BaseResource):
     """Prompts resource for synchronous operations."""
 
@@ -276,7 +354,7 @@ class PromptsResource(BaseResource):
         """
         
         version_data = {
-            "prompt": convert_to_openai_messages(prompt_messages),
+            "prompt": convert_messages_with_placeholder(prompt_messages),
             "labels": labels or [],
             "metadata": metadata or {},
             "commit_message": commit_message or "New version",
@@ -678,7 +756,7 @@ class AsyncPromptsResource(AsyncBaseResource):
         """
 
         version_data = {
-            "prompt": convert_to_openai_messages(prompt_messages),
+            "prompt": convert_messages_with_placeholder(prompt_messages),
             "labels": labels or [],
             "metadata": metadata or {},
             "commit_message": commit_message or "New version",
